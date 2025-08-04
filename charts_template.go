@@ -15,13 +15,13 @@ func getFooter() string {
 
 // GetChartTemplate returns HTML
 func GetChartTemplate(chartType string) (*template.Template, error) {
-	html := getContentHTML()
+	var html string
 	if chartType == BUBBLE_CHART {
-		html += getOpStatsChart()
+		html = getOpStatsChart()
 	} else if chartType == PIE_CHART {
-		html += getPieChart()
+		html = getPieChart()
 	} else if chartType == BAR_CHART {
-		html += getConnectionsChart()
+		html = getConnectionsChart()
 	}
 	html += `
 	<div style="float: left; width: 100%; clear: left;">
@@ -29,9 +29,7 @@ func GetChartTemplate(chartType string) (*template.Template, error) {
 		<input type='datetime-local' id='end' value='{{.End}}'></input>
 		<button onClick="refreshChart(); return false;" class="button">Refresh</button>
   	</div>
-  	<div id='hatchetChart' class='chart' style="clear: left;"></div>
-  
-		</body></html>`
+	<div id='hatchetChart' class='chart' style="clear: left;"></div>`
 
 	return template.New("hatchet").Funcs(template.FuncMap{
 		"descr": func(v OpCount) template.HTML {
@@ -58,50 +56,53 @@ func GetChartTemplate(chartType string) (*template.Template, error) {
 func getOpStatsChart() string {
 	return `
 {{ if .OpCounts }}
+<canvas id="hatchetChart"></canvas>
 <script>
 	setChartType();
-	google.charts.load('current', {'packages':['corechart']});
-	google.charts.setOnLoadCallback(drawChart);
-
-	function drawChart() {
-		var data = google.visualization.arrayToDataTable([
-	{{if eq .Type "ops"}}
-			['op', 'date/time', 'duration (seconds)', 'ns', 'counts'],
-	{{else}}
-			['op', 'date/time', 'count', 'ns/filter'],
-	{{end}}
-	{{$ctype := .Type}}
-	{{range $i, $v := .OpCounts}}
-		{{if eq $ctype "ops"}}
-			[{{$v.Op}}, new Date("{{$v.Date}}"), {{toSeconds $v.Milli}}, '{{descr $v}}', {{$v.Count}}],
-		{{else}}
-			[{{$v.Op}}, new Date("{{$v.Date}}"), {{$v.Count}}, '{{descr $v}}'],
-		{{end}}
-	{{end}}
-		]);
-		// Set chart options
-		var options = {
-			'backgroundColor': { 'fill': 'transparent' },
-			'title': '{{.Chart.Title}}',
-			// 'hAxis': { textPosition: 'none' },
-			'hAxis': { slantedText: true, slantedTextAngle: 30 },
-			'vAxis': {title: '{{.VAxisLabel}}', minValue: 0},
-			'width': '100%',
-			'height': 480,
-			'titleTextStyle': {'fontSize': 20},
-			'explorer': { actions: ['dragToZoom', 'rightClickToReset'] },
-	{{if eq $ctype "ops"}}
-			'sizeAxis': {minValue: 0, minSize: 5, maxSize: 30},
-	{{else}}
-			'sizeAxis': {minValue: 0, minSize: 5, maxSize: 5},
-	{{end}}
-			'chartArea': {'width': '85%', 'height': '80%'},
-			'tooltip': { 'isHtml': false },
-			'legend': { 'position': 'none' } };
-		// Instantiate and draw our chart, passing in some options.
-		var chart = new google.visualization.BubbleChart(document.getElementById('hatchetChart'));
-		chart.draw(data, options);
-	}
+	const ctx = document.getElementById('hatchetChart').getContext('2d');
+	const chart = new Chart(ctx, {
+		type: 'bubble',
+		data: {
+			datasets: [{
+				label: '{{.Chart.Title}}',
+				data: [
+				{{range $i, $v := .OpCounts}}
+					{
+						x: new Date("{{$v.Date}}"),
+						y: {{toSeconds $v.Milli}},
+						r: {{$v.Count}}
+					},
+				{{end}}
+				],
+				backgroundColor: 'rgba(255, 99, 132, 0.2)',
+				borderColor: 'rgba(255, 99, 132, 1)',
+				borderWidth: 1
+			}]
+		},
+		options: {
+			responsive: true,
+			plugins: {
+				title: {
+					display: true,
+					text: '{{.Chart.Title}}'
+				}
+			},
+			scales: {
+				x: {
+					type: 'time',
+					time: {
+						unit: 'day'
+					}
+				},
+				y: {
+					title: {
+						display: true,
+						text: '{{.VAxisLabel}}'
+					}
+				}
+			}
+		}
+	});
 </script>
 {{else}}
 <div align='center' class='btn'><span style='color: red'>no data found</span></div>
@@ -111,32 +112,54 @@ func getOpStatsChart() string {
 func getPieChart() string {
 	return `
 {{ if .NameValues }}
+<canvas id="hatchetChart"></canvas>
 <script>
 	setChartType();
-	google.charts.load('current', {'packages':['corechart']});
-	google.charts.setOnLoadCallback(drawChart);
-
-	function drawChart() {
-		var data = google.visualization.arrayToDataTable([
-			['Name', 'Value'],
-	{{range $i, $v := .NameValues}}
-			['{{$v.Name}}', {{$v.Value}}],
-	{{end}}
-		]);
-		// Set chart options
-		var options = {
-			'backgroundColor': { 'fill': 'transparent' },
-			'title': '{{.Chart.Title}}',
-			'width': '100%',
-			'height': 480,
-			'titleTextStyle': {'fontSize': 20},
-			'slices': {},
-			'legend': { 'position': 'right' } };
-		options.slices[data.getSortedRows([{column: 1, desc: true}])[0]] = {offset: 0.1};
-		// Instantiate and draw our chart, passing in some options.
-		var chart = new google.visualization.PieChart(document.getElementById('hatchetChart'));
-		chart.draw(data, options);
-	}
+	const ctx = document.getElementById('hatchetChart').getContext('2d');
+	const chart = new Chart(ctx, {
+		type: 'pie',
+		data: {
+			labels: [
+				{{range $i, $v := .NameValues}}
+					'{{$v.Name}}',
+				{{end}}
+			],
+			datasets: [{
+				label: '{{.Chart.Title}}',
+				data: [
+					{{range $i, $v := .NameValues}}
+						{{$v.Value}},
+					{{end}}
+				],
+				backgroundColor: [
+					'rgba(255, 99, 132, 0.2)',
+					'rgba(54, 162, 235, 0.2)',
+					'rgba(255, 206, 86, 0.2)',
+					'rgba(75, 192, 192, 0.2)',
+					'rgba(153, 102, 255, 0.2)',
+					'rgba(255, 159, 64, 0.2)'
+				],
+				borderColor: [
+					'rgba(255, 99, 132, 1)',
+					'rgba(54, 162, 235, 1)',
+					'rgba(255, 206, 86, 1)',
+					'rgba(75, 192, 192, 1)',
+					'rgba(153, 102, 255, 1)',
+					'rgba(255, 159, 64, 1)'
+				],
+				borderWidth: 1
+			}]
+		},
+		options: {
+			responsive: true,
+			plugins: {
+				title: {
+					display: true,
+					text: '{{.Chart.Title}}'
+				}
+			}
+		}
+	});
 </script>
 {{else}}
 <div align='center' class='btn'><span style='color: red'>no data found</span></div>
@@ -146,47 +169,61 @@ func getPieChart() string {
 func getConnectionsChart() string {
 	return `
 {{ if .Remote }}
+<canvas id="hatchetChart"></canvas>
 <script>
 	setChartType();
-	google.charts.load('current', {'packages':['corechart']});
-	google.charts.setOnLoadCallback(drawChart);
-
-	function drawChart() {
-	{{$ctype := .Type}}
-		var data = google.visualization.arrayToDataTable([
-	{{if eq $ctype "connections-time"}}
-			['Date/Time', 'Connections'],
-	{{else}}
-			['IP', 'Accepted', 'Ended'],
-	{{end}}
-
-	{{range $i, $v := .Remote}}
-		{{if eq $ctype "connections-time"}}
-			[new Date("{{$v.IP}}"), {{$v.Accepted}}],
-		{{else}}
-			['{{$v.IP}}', {{$v.Accepted}}, {{$v.Ended}}],
-		{{end}}
-	{{end}}
-		]);
-		// Set chart options
-		var options = {
-			'backgroundColor': { 'fill': 'transparent' },
-			'title': '{{.Chart.Title}}',
-			'hAxis': { slantedText: true, slantedTextAngle: 30 },
-			'vAxis': {title: 'Count', minValue: 0},
-			'width': '100%',
-			'height': 480,
-			'titleTextStyle': {'fontSize': 20},
-			'explorer': { actions: ['dragToZoom', 'rightClickToReset'] },
-			'legend': { 'position': 'right' } };
-		// Instantiate and draw our chart, passing in some options.
-	{{if eq $ctype "connections-time"}}
-		var chart = new google.visualization.LineChart(document.getElementById('hatchetChart'));
-	{{else}}
-		var chart = new google.visualization.ColumnChart(document.getElementById('hatchetChart'));
-	{{end}}
-		chart.draw(data, options);
-	}
+	const ctx = document.getElementById('hatchetChart').getContext('2d');
+	const chart = new Chart(ctx, {
+		type: 'bar',
+		data: {
+			labels: [
+				{{range $i, $v := .Remote}}
+					'{{$v.IP}}',
+				{{end}}
+			],
+			datasets: [
+				{
+					label: 'Accepted',
+					data: [
+						{{range $i, $v := .Remote}}
+							{{$v.Accepted}},
+						{{end}}
+					],
+					backgroundColor: 'rgba(54, 162, 235, 0.2)',
+					borderColor: 'rgba(54, 162, 235, 1)',
+					borderWidth: 1
+				},
+				{
+					label: 'Ended',
+					data: [
+						{{range $i, $v := .Remote}}
+							{{$v.Ended}},
+						{{end}}
+					],
+					backgroundColor: 'rgba(255, 99, 132, 0.2)',
+					borderColor: 'rgba(255, 99, 132, 1)',
+					borderWidth: 1
+				}
+			]
+		},
+		options: {
+			responsive: true,
+			plugins: {
+				title: {
+					display: true,
+					text: '{{.Chart.Title}}'
+				}
+			},
+			scales: {
+				x: {
+					stacked: true,
+				},
+				y: {
+					stacked: true
+				}
+			}
+		}
+	});
 </script>
 {{else}}
 <div align='center' class='btn'><span style='color: red'>no data found</span></div>

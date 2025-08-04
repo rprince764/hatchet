@@ -17,13 +17,12 @@ var (
 
 // GetLogTableTemplate returns HTML
 func GetLogTableTemplate(attr string) (*template.Template, error) {
-	html := getContentHTML()
+	var html string
 	if attr == "slowops" {
-		html += getSlowOpsLogsTable()
+		html = getSlowOpsLogsTable()
 	} else {
-		html += getLegacyLogsTable()
+		html = getLegacyLogsTable()
 	}
-	html += "</body></html>"
 	return template.New("hatchet").Funcs(template.FuncMap{
 		"add": func(a int, b int) int {
 			return a + b
