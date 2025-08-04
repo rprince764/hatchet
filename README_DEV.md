@@ -17,6 +17,7 @@ The easiest way is to go to the home page `http://localhost:3721` and following 
 
 - `/hatchets/{hatchet}/stats/audit` view audit data
 - `/hatchets/{hatchet}/stats/slowops?COLLSCAN=true&orderBy=count` views stats summary of COLLSCAN logs and sorted by *count*
+- `/hatchets/{hatchet}/stats/query_framework` view query framework counts
 - `/hatchets/{hatchet}/logs/slowops` views top 23 slowest ops logs
 - `/hatchets/{hatchet}/logs/slowops?topN=100` views top 100 slowest ops logs
 - `/hatchets/{hatchet}/logs/all` views all logs, and available query string parameters are:

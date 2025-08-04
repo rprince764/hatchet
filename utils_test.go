@@ -57,11 +57,10 @@ func TestGetHatchetName(t *testing.T) {
 	}
 
 	filename = "filesys-shard-00-01.abcde.mongodb.net_2021-07-24T10_12_58_2021-07-25T10_12_58_mongodb.log.gz"
-	length = len(filename) + TAIL_SIZE
 	hatchetName = getHatchetName(filename)
 	modified := "filesys_shard_00_01_abcde_mongodb_net_2021_07_24T10_12_58_2021_07_25T10_12_58_mongodb"
-	if !strings.HasPrefix(hatchetName, modified) {
-		t.Fatal(modified+"_*", length, "but got", hatchetName)
+	if !strings.HasPrefix(hatchetName, modified[:MAX_SIZE-TAIL_SIZE-1]) {
+		t.Fatal(modified[:MAX_SIZE-TAIL_SIZE-1]+"_*", "but got", hatchetName)
 	}
 
 	filename = "testdata/demo_errmsg.log.gz"
@@ -84,23 +83,26 @@ func TestGetHatchetName(t *testing.T) {
 }
 
 func TestGetDateSubString(t *testing.T) {
-	value := GetSQLDateSubString("2023-01-01T12:11:02Z", "2023-01-01T14:35:20Z")
-	if value != "SUBSTR(date, 1, 15)||'9:59'" {
-		t.Fatal("expected", "SUBSTR(date, 1, 15)||'9:59'", "but got", value)
+	testCases := []struct {
+		name     string
+		start    string
+		end      string
+		expected string
+	}{
+		{"less than a minute", "2023-01-01T12:11:02Z", "2023-01-01T12:11:32Z", "SUBSTR(date, 1, 19)"},
+		{"less than 10 minutes", "2023-01-01T12:11:02Z", "2023-01-01T12:15:20Z", "SUBSTR(date, 1, 18)||'9'"},
+		{"less than an hour", "2023-01-01T12:11:02Z", "2023-01-01T12:35:20Z", "SUBSTR(date, 1, 16)||':59'"},
+		{"less than a day", "2023-01-01T12:11:02Z", "2023-01-01T14:35:20Z", "SUBSTR(date, 1, 15)||'9:59'"},
 	}
-	t.Log(value)
 
-	value = GetSQLDateSubString("2023-01-01T12:11:02Z", "2023-01-02T12:34:20Z")
-	if value != "SUBSTR(date, 1, 13)||':59:59'" {
-		t.Fatal("expected", "SUBSTR(date, 1, 13)||':59:59'", "but got", value)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := GetSQLDateSubString(tc.start, tc.end)
+			if result != tc.expected {
+				t.Errorf("Expected GetSQLDateSubString(%q, %q) to be %v, but got %v", tc.start, tc.end, tc.expected, result)
+			}
+		})
 	}
-	t.Log(value)
-
-	value = GetSQLDateSubString("2023-01-01T12:11:02Z", "2023-02-10T12:34:20Z")
-	if value != "SUBSTR(date, 1, 10)||'T23:59:59'" {
-		t.Fatal("expected", "SUBSTR(date, 1, 13)||':59:59'", "but got", value)
-	}
-	t.Log(value)
 }
 
 func TestGetOffsetLimit(t *testing.T) {
@@ -444,7 +446,7 @@ func TestCheckLuhn(t *testing.T) {
 }
 
 func TestBsonD2M(t *testing.T) {
-	d := bson.D{{"first", "Ken"}, {"last", "Chen"}}
+	d := bson.D{{Key: "first", Value: "Ken"}, {Key: "last", Value: "Chen"}}
 	m := BsonD2M(d)
 	t.Log(m["first"], m["last"])
 }

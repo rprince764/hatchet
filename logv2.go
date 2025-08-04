@@ -58,13 +58,15 @@ type Logv2 struct {
 
 // Logv2Info stores logv2 struct
 type Logv2Info struct {
-	Attr      bson.D    `json:"attr" bson:"attr"`
-	Component string    `json:"c" bson:"c"`
-	Context   string    `json:"ctx" bson:"ctx"`
-	ID        int       `json:"id" bson:"id"`
-	Msg       string    `json:"msg" bson:"msg"`
-	Severity  string    `json:"s" bson:"s"`
-	Timestamp time.Time `json:"t" bson:"t"`
+	Attr      bson.D                 `json:"attr" bson:"attr"`
+	Component string                 `json:"c" bson:"c"`
+	Context   string                 `json:"ctx" bson:"ctx"`
+	ID        int                    `json:"id" bson:"id"`
+	Msg       string                 `json:"msg" bson:"msg"`
+	Severity  string                 `json:"s" bson:"s"`
+	Timestamp time.Time              `json:"t" bson:"t"`
+	Truncated map[string]interface{} `json:"truncated,omitempty" bson:"truncated,omitempty"`
+	Size      map[string]interface{} `json:"size,omitempty" bson:"size,omitempty"`
 
 	Attributes Attributes
 	Message    string // remaining legacy message
@@ -73,14 +75,27 @@ type Logv2Info struct {
 }
 
 type Attributes struct {
-	Command            map[string]interface{} `json:"command" bson:"command"`
-	ErrMsg             string                 `json:"errMsg" bson:"errMsg"`
-	Milli              int                    `json:"durationMillis" bson:"durationMillis"`
-	NS                 string                 `json:"ns" bson:"ns"`
-	OriginatingCommand map[string]interface{} `json:"originatingCommand" bson:"originatingCommand"`
-	PlanSummary        string                 `json:"planSummary" bson:"planSummary"`
-	Reslen             int                    `json:"reslen" bson:"reslen"`
-	Type               string                 `json:"type" bson:"type"`
+	Command                                    map[string]interface{}   `json:"command" bson:"command"`
+	ErrMsg                                     string                   `json:"errMsg" bson:"errMsg"`
+	Milli                                      int                      `json:"durationMillis" bson:"durationMillis"`
+	NS                                         string                   `json:"ns" bson:"ns"`
+	OriginatingCommand                         map[string]interface{}   `json:"originatingCommand" bson:"originatingCommand"`
+	PlanSummary                                string                   `json:"planSummary" bson:"planSummary"`
+	Reslen                                     int                      `json:"reslen" bson:"reslen"`
+	Type                                       string                   `json:"type" bson:"type"`
+	RemoteOpWaitMillis                         int                      `json:"remoteOpWaitMillis,omitempty" bson:"remoteOpWaitMillis,omitempty"`
+	ResolvedViews                              []map[string]interface{} `json:"resolvedViews,omitempty" bson:"resolvedViews,omitempty"`
+	Authorization                              map[string]interface{}   `json:"authorization,omitempty" bson:"authorization,omitempty"`
+	CatalogCacheDatabaseLookupDurationMillis   int                      `json:"catalogCacheDatabaseLookupDurationMillis,omitempty" bson:"catalogCacheDatabaseLookupDurationMillis,omitempty"`
+	CatalogCacheCollectionLookupDurationMillis int                      `json:"catalogCacheCollectionLookupDurationMillis,omitempty" bson:"catalogCacheCollectionLookupDurationMillis,omitempty"`
+	CatalogCacheIndexLookupDurationMillis      int                      `json:"catalogCacheIndexLookupDurationMillis,omitempty" bson:"catalogCacheIndexLookupDurationMillis,omitempty"`
+	PlacementVersionRefreshMillis              int                      `json:"placementVersionRefreshMillis,omitempty" bson:"placementVersionRefreshMillis,omitempty"`
+	QueryFramework                             string                   `json:"queryFramework,omitempty" bson:"queryFramework,omitempty"`
+	CPUNanos                                   int64                    `json:"cpuNanos,omitempty" bson:"cpuNanos,omitempty"`
+	TotalOplogSlotDurationMicros               int                      `json:"totalOplogSlotDurationMicros,omitempty" bson:"totalOplogSlotDurationMicros,omitempty"`
+	Queues                                     map[string]interface{}   `json:"queues,omitempty" bson:"queues,omitempty"`
+	PlanCacheShapeHash                         string                   `json:"planCacheShapeHash,omitempty" bson:"planCacheShapeHash,omitempty"`
+	WorkingMillis                              int                      `json:"workingMillis,omitempty" bson:"workingMillis,omitempty"`
 }
 
 type RemoteClient struct {

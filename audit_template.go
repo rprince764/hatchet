@@ -181,7 +181,6 @@ func GetAuditTablesTemplate() (*template.Template, error) {
 			return printer.Sprintf("%v", numbers[i])
 		},
 		"coinToss": func() bool {
-			rand.Seed(time.Now().UnixNano())
 			randomNum := rand.Intn(2)
 			return (randomNum%2 == 0)
 		},

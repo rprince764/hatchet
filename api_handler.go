@@ -25,7 +25,9 @@ func APIHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params
 	category := params.ByName("category")
 	dbase, err := GetDatabase(hatchetName)
 	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()})
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()}); err != nil {
+			log.Println("Error encoding JSON:", err)
+		}
 		return
 	}
 	defer dbase.Close()
@@ -40,27 +42,39 @@ func APIHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params
 		}
 		ops, err := dbase.GetSlowOps(orderBy, "DESC", false)
 		if err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()})
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()}); err != nil {
+				log.Println("Error encoding JSON:", err)
+			}
 		}
 		doc := map[string]interface{}{"hatchet": hatchetName, "has_more": false, "offset": 0, "limit": len(ops), "ops": ops}
 		b, err := json.Marshal(doc)
 		if err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()})
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()}); err != nil {
+				log.Println("Error encoding JSON:", err)
+			}
 		} else {
-			w.Write(b)
+			if _, err := w.Write(b); err != nil {
+				log.Println("Error writing response:", err)
+			}
 		}
 		return
 	} else if category == "stats" && attr == "audit" {
 		data, err := dbase.GetAuditData()
 		if err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()})
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()}); err != nil {
+				log.Println("Error encoding JSON:", err)
+			}
 		}
 		doc := map[string]interface{}{"hatchet": hatchetName, "audit": data}
 		b, err := json.Marshal(doc)
 		if err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()})
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()}); err != nil {
+				log.Println("Error encoding JSON:", err)
+			}
 		} else {
-			w.Write(b)
+			if _, err := w.Write(b); err != nil {
+				log.Println("Error writing response:", err)
+			}
 		}
 		return
 	} else if category == "logs" && attr == "slowops" {
@@ -70,14 +84,20 @@ func APIHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params
 		}
 		logs, err := dbase.GetSlowestLogs(topN)
 		if err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()})
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()}); err != nil {
+				log.Println("Error encoding JSON:", err)
+			}
 		}
 		doc := map[string]interface{}{"hatchet": hatchetName, "has_more": false, "offset": 0, "limit": len(logs), "logs": logs}
 		b, err := json.Marshal(doc)
 		if err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()})
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()}); err != nil {
+				log.Println("Error encoding JSON:", err)
+			}
 		} else {
-			w.Write(b)
+			if _, err := w.Write(b); err != nil {
+				log.Println("Error writing response:", err)
+			}
 		}
 		return
 	} else if category == "logs" && attr == "all" {
@@ -94,7 +114,9 @@ func APIHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params
 		logs, err := dbase.GetLogs(fmt.Sprintf("component=%v", component), fmt.Sprintf("limit=%v", limit),
 			fmt.Sprintf("context=%v", context), fmt.Sprintf("severity=%v", severity), fmt.Sprintf("duration=%v", duration))
 		if err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()})
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()}); err != nil {
+				log.Println("Error encoding JSON:", err)
+			}
 			return
 		}
 		hasMore = len(logs) > nlimit
@@ -104,11 +126,17 @@ func APIHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params
 		var b []byte
 		doc := map[string]interface{}{"hatchet": hatchetName, "has_more": hasMore, "offset": offset, "limit": len(logs), "logs": logs}
 		if b, err = json.Marshal(doc); err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()})
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()}); err != nil {
+				log.Println("Error encoding JSON:", err)
+			}
 			return
 		}
-		w.Write(b)
+		if _, err := w.Write(b); err != nil {
+			log.Println("Error writing response:", err)
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"ok": 1, "message": "Hello Hatchet API!"})
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": 1, "message": "Hello Hatchet API!"}); err != nil {
+		log.Println("Error encoding JSON:", err)
+	}
 }

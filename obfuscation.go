@@ -14,7 +14,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/simagix/gox"
 	"go.mongodb.org/mongo-driver/bson"
@@ -50,7 +49,6 @@ type Obfuscation struct {
 
 func NewObfuscation() *Obfuscation {
 	obs := Obfuscation{}
-	rand.Seed(time.Now().UnixNano())
 	obs.Coefficient = 0.923 - rand.Float64()*0.05
 	obs.Coefficient = math.Round(obs.Coefficient*1000) / 1000
 	obs.CardMap = make(map[string]string)
@@ -248,7 +246,6 @@ func (ptr *Obfuscation) ObfuscateEmail(email string) string {
 		if ptr.NameMap[matched] != "" {
 			newValue = ptr.NameMap[matched]
 		} else {
-			rand.Seed(time.Now().UnixNano())
 			newValue = strings.ToLower(flower + "@" + city + ".com")
 			ptr.NameMap[matched] = newValue
 			ptr.NameMap[newValue] = newValue
@@ -299,7 +296,6 @@ func (ptr *Obfuscation) ObfuscateFQDN(fqdn string) string {
 		if ptr.NameMap[matched] != "" {
 			newValue = ptr.NameMap[matched]
 		} else {
-			rand.Seed(time.Now().UnixNano())
 			city := cities[rand.Intn(len(cities))]
 			flower := flowers[rand.Intn(len(flowers))]
 			parts := strings.Split(matched, ".")
@@ -335,7 +331,6 @@ func (ptr *Obfuscation) ObfuscateNS(ns string) string {
 		if ptr.NameMap[matched] != "" {
 			newValue = ptr.NameMap[matched]
 		} else {
-			rand.Seed(time.Now().UnixNano())
 			city := cities[rand.Intn(len(cities))]
 			flower := flowers[rand.Intn(len(flowers))]
 			parts := strings.Split(matched, ".")
@@ -392,7 +387,6 @@ func (ptr *Obfuscation) ObfuscatePhoneNo(phoneNo string) string {
 	if ptr.PhoneMap[phoneNo] != "" {
 		return ptr.PhoneMap[phoneNo]
 	}
-	rand.Seed(time.Now().UnixNano())
 	obfuscated := make([]byte, len(phoneNo))
 	n := 0
 	for i := range obfuscated {

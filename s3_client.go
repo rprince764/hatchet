@@ -17,16 +17,17 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 )
 
 // S3Client provides methods to interact with an S3 service.
 type S3Client struct {
-	service *s3.S3
+	service s3iface.S3API
 }
 
-func NewS3Client(profile string, params...string) (*S3Client, error) {
+func NewS3Client(profile string, params ...string) (*S3Client, error) {
 	sess, err := session.NewSessionWithOptions(session.Options{
-		Profile: profile,
+		Profile:           profile,
 		SharedConfigState: session.SharedConfigEnable,
 		Config: aws.Config{
 			CredentialsChainVerboseErrors: aws.Bool(true),

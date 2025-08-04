@@ -87,5 +87,22 @@ func StatsHandler(w http.ResponseWriter, r *http.Request, params httprouter.Para
 			return
 		}
 		return
+	} else if attr == "query_framework" {
+		data, err := dbase.GetQueryFrameworkCounts("all")
+		if err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()})
+			return
+		}
+		templ, err := GetQueryFrameworkTemplate()
+		if err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()})
+			return
+		}
+		doc := map[string]interface{}{"Hatchet": hatchetName, "Info": info, "Summary": summary, "Data": data}
+		if err = templ.Execute(w, doc); err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{"ok": 0, "error": err.Error()})
+			return
+		}
+		return
 	}
 }

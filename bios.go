@@ -98,7 +98,7 @@ func insertBios(client *mongo.Client, wg *sync.WaitGroup, size int) error {
 		}
 
 		// Insert the documents in this batch
-		_, err = collection.InsertMany(context.Background(), docs)
+		_, err = collection.InsertMany(context.TODO(), docs)
 		if err != nil {
 			return err
 		}
@@ -109,32 +109,36 @@ func insertBios(client *mongo.Client, wg *sync.WaitGroup, size int) error {
 
 func InsertBiosIntoMongoDB(uri string, numDocuments int) error {
 	log.Println(uri, numDocuments)
-	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(uri))
 	if err != nil {
 		return err
 	}
-
-	err = client.Connect(context.Background())
-	if err != nil {
-		return err
-	}
+	defer func() {
+		if err = client.Disconnect(context.TODO()); err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	var wg sync.WaitGroup
+	errChan := make(chan error, 1)
 
 	// Divide the work among N goroutines
 	numThreads := 4
 	chunkSize := numDocuments / numThreads
 	for i := 0; i < numThreads; i++ {
 		wg.Add(1)
-		go insertBios(client, &wg, chunkSize)
+		go func() {
+			if err := insertBios(client, &wg, chunkSize); err != nil {
+				errChan <- err
+			}
+		}()
 	}
 
 	wg.Wait()
-	err = client.Disconnect(context.Background())
-	if err != nil {
+	close(errChan)
+	if err := <-errChan; err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -149,12 +153,16 @@ func SimulateTests(test string, url string) error {
 
 func SimulateReads(url string) error {
 	pipeline := mongo.Pipeline{}
-	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(url))
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(url))
 	if err != nil {
 		fmt.Println("Failed to connect to MongoDB:", err)
 		return err
 	}
-	defer client.Disconnect(context.Background())
+	defer func() {
+		if err = client.Disconnect(context.TODO()); err != nil {
+			log.Fatal(err)
+		}
+	}()
 	collection := client.Database(BioDBName).Collection(BioCollName)
 	wg := sync.WaitGroup{}
 	numThreads := runtime.NumCPU() * 4
@@ -189,16 +197,16 @@ func SimulateReads(url string) error {
 					pipeline = mongo.Pipeline{match, project}
 				}
 				// Run the aggregation pipeline
-				cursor, err := collection.Aggregate(context.Background(), pipeline)
+				cursor, err := collection.Aggregate(context.TODO(), pipeline)
 				if err != nil {
 					log.Fatal("Failed to run aggregation pipeline:", err)
 					return
 				}
 
 				// Process the aggregation result
-				defer cursor.Close(context.Background())
+				defer cursor.Close(context.TODO())
 				time.Sleep(20 * time.Millisecond)
-				for cursor.Next(context.Background()) {
+				for cursor.Next(context.TODO()) {
 					// Process the aggregation result here
 				}
 				if err := cursor.Err(); err != nil {
@@ -223,12 +231,16 @@ func SimulateReads(url string) error {
 }
 
 func SimulateWrites(url string) error {
-	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(url))
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(url))
 	if err != nil {
 		fmt.Println("Failed to connect to MongoDB:", err)
 		return err
 	}
-	defer client.Disconnect(context.Background())
+	defer func() {
+		if err = client.Disconnect(context.TODO()); err != nil {
+			log.Fatal(err)
+		}
+	}()
 	collection := client.Database(BioDBName).Collection(BioCollName)
 	wg := sync.WaitGroup{}
 	numThreads := runtime.NumCPU() * 4
@@ -257,7 +269,7 @@ func SimulateWrites(url string) error {
 					match = bson.D{{Key: "state", Value: fake.State()}}
 				}
 				// Run updateMany
-				_, err := collection.UpdateMany(context.Background(), match, updated)
+				_, err := collection.UpdateMany(context.TODO(), match, updated)
 				if err != nil {
 					log.Fatal("Failed to run update:", err)
 				}
