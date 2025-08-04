@@ -71,10 +71,14 @@ func Run(fullVersion string) {
 		}
 		return
 	} else if *bios && len(flag.Args()) > 1 {
-		InsertBiosIntoMongoDB(flag.Args()[0], ToInt(flag.Args()[1]))
+		if err := InsertBiosIntoMongoDB(flag.Args()[0], ToInt(flag.Args()[1])); err != nil {
+			log.Fatal(err)
+		}
 		return
 	} else if *sim != "" && len(flag.Args()) > 0 {
-		SimulateTests(*sim, flag.Args()[0])
+		if err := SimulateTests(*sim, flag.Args()[0]); err != nil {
+			log.Fatal(err)
+		}
 		return
 	}
 	if !*legacy {
@@ -93,7 +97,7 @@ func Run(fullVersion string) {
 	layout := "2006-01-02T15:04:05"
 	fromTime, err := time.Parse(layout, *from)
 	if err != nil {
-		fromTime, err = time.Parse(layout, "2000-01-01T00:00:00")
+		fromTime, _ = time.Parse(layout, "2000-01-01T00:00:00")
 	}
 	toTime, err := time.Parse(layout, *to)
 	if err != nil {
@@ -138,11 +142,15 @@ func Run(fullVersion string) {
 			log.Fatal(err)
 		}
 		if !*merge && !*legacy {
-			logv2.PrintSummary()
+			if err := logv2.PrintSummary(); err != nil {
+				log.Println("Error printing summary:", err)
+			}
 		}
 	}
 	if *merge && !*legacy {
-		logv2.PrintSummary()
+		if err := logv2.PrintSummary(); err != nil {
+			log.Println("Error printing summary:", err)
+		}
 	}
 	if *legacy || !*web {
 		if len(flag.Args()) == 0 {
@@ -161,6 +169,7 @@ func Run(fullVersion string) {
 	router.GET("/hatchets/:hatchet/charts/:attr", ChartsHandler)
 	router.GET("/hatchets/:hatchet/logs/:attr", LogsHandler)
 	router.GET("/hatchets/:hatchet/stats/:attr", StatsHandler)
+	router.GET("/hatchets/:hatchet/stats/query_framework", StatsHandler)
 
 	addr := fmt.Sprintf(":%d", *port)
 	if listener, err := net.Listen("tcp", addr); err != nil {
@@ -177,13 +186,19 @@ func FaviconHandler(w http.ResponseWriter, r *http.Request, params httprouter.Pa
 	r.Header.Set("Connection", "close")
 	w.Header().Set("Content-Type", "image/x-icon")
 	ico, _ := base64.StdEncoding.DecodeString(CHEN_ICO)
-	w.Write(ico)
+	if _, err := w.Write(ico); err != nil {
+		log.Println("Error writing response:", err)
+	}
 }
 
 func Index(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	fmt.Fprint(w, "Welcome!\n")
+	if _, err := fmt.Fprint(w, "Welcome!\n"); err != nil {
+		log.Println("Error writing response:", err)
+	}
 }
 
 func Hello(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	fmt.Fprintf(w, "hello, %s!\n", ps.ByName("name"))
+	if _, err := fmt.Fprintf(w, "hello, %s!\n", ps.ByName("name")); err != nil {
+		log.Println("Error writing response:", err)
+	}
 }

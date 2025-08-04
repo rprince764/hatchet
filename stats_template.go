@@ -118,3 +118,23 @@ func getStatsTable(collscan bool, orderBy string, download string) string {
 </div>`
 	return html
 }
+
+// GetQueryFrameworkTemplate returns HTML
+func GetQueryFrameworkTemplate() (*template.Template, error) {
+	html := getContentHTML()
+	html += `
+	<div align='left'>
+	<table width='100%'><tr><th>Query Framework</th><th>Count</th></tr>
+{{range $n, $value := .Data}}
+		<tr>
+			<td>{{ $value.Name }}</td>
+			<td align='right'>{{ $value.Value }}</td>
+		</tr>
+{{end}}
+	</table>
+	</div>
+	<div align='center'><hr/><p/>@simagix</div>
+</div>`
+	html += "</body></html>"
+	return template.New("hatchet").Parse(html)
+}

@@ -6,12 +6,20 @@
 package hatchet
 
 import (
+	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
 func TestGetHTTPContent(t *testing.T) {
-	reader, err := GetHTTPContent("http://localhost:9090/testdata/my-file.txt", "", "")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "hello, client")
+	}))
+	defer server.Close()
+
+	reader, err := GetHTTPContent(server.URL, "", "")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -20,5 +28,9 @@ func TestGetHTTPContent(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	t.Log(string(content))
+
+	expected := "hello, client\n"
+	if string(content) != expected {
+		t.Errorf("unexpected content: got %q, want %q", string(content), expected)
+	}
 }

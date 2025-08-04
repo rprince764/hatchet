@@ -35,11 +35,14 @@ func NewMongoDB(connstr string, hatchetName string) (*MongoDB, error) {
 	var err error
 	mongodb := &MongoDB{url: connstr, hatchetName: hatchetName}
 	clientOptions := options.Client().ApplyURI(connstr)
-	client, err := mongo.Connect(context.Background(), clientOptions)
+	client, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
 		return mongodb, err
 	}
 	u, err := url.Parse(connstr)
+	if err != nil {
+		return nil, err
+	}
 	dbName := u.Path[1:]
 	if dbName == "" || dbName == "admin" {
 		dbName = "logdb"
@@ -70,7 +73,7 @@ func (ptr *MongoDB) Begin() error {
 			Keys:    keys,
 			Options: options.Index().SetUnique(false),
 		}
-		_, err = ptr.db.Collection(collName).Indexes().CreateOne(context.Background(), index)
+		_, err = ptr.db.Collection(collName).Indexes().CreateOne(context.TODO(), index)
 		if err != nil {
 			return err
 		}
@@ -81,7 +84,7 @@ func (ptr *MongoDB) Begin() error {
 		Keys:    bson.D{{Key: "context", Value: 1}, {Key: "ip", Value: 1}},
 		Options: options.Index().SetUnique(false),
 	}
-	_, err = ptr.db.Collection(collName).Indexes().CreateOne(context.Background(), index)
+	_, err = ptr.db.Collection(collName).Indexes().CreateOne(context.TODO(), index)
 	if err != nil {
 		return err
 	}
@@ -91,48 +94,92 @@ func (ptr *MongoDB) Begin() error {
 
 func (ptr *MongoDB) Commit() error {
 	if len(ptr.logs) > 0 {
-		ptr.db.Collection(ptr.hatchetName).InsertMany(context.Background(), ptr.logs)
+		if _, err := ptr.db.Collection(ptr.hatchetName).InsertMany(context.TODO(), ptr.logs); err != nil {
+			log.Println("Commit logs failed:", err)
+			return err
+		}
 		ptr.logs = []interface{}{}
 	}
 	if len(ptr.clients) > 0 {
-		ptr.db.Collection(ptr.hatchetName+"_clients").InsertMany(context.Background(), ptr.clients)
+		if _, err := ptr.db.Collection(ptr.hatchetName+"_clients").InsertMany(context.TODO(), ptr.clients); err != nil {
+			log.Println("Commit clients failed:", err)
+			return err
+		}
 		ptr.clients = []interface{}{}
 	}
 	if len(ptr.drivers) > 0 {
-		ptr.db.Collection(ptr.hatchetName+"_drivers").InsertMany(context.Background(), ptr.drivers)
+		if _, err := ptr.db.Collection(ptr.hatchetName+"_drivers").InsertMany(context.TODO(), ptr.drivers); err != nil {
+			log.Println("Commit drivers failed:", err)
+			return err
+		}
 		ptr.drivers = []interface{}{}
 	}
 	return nil
 }
 
 func (ptr *MongoDB) Close() error {
-	var err error
-	defer ptr.db.Client().Disconnect(context.Background())
-	return err
+	return ptr.db.Client().Disconnect(context.TODO())
 }
 
 // Drop drops all tables of a hatchet
 func (ptr *MongoDB) Drop() error {
-	var err error
-	ptr.db.Collection(ptr.hatchetName + "_audit").Drop(context.Background())
-	ptr.db.Collection(ptr.hatchetName + "_clients").Drop(context.Background())
-	ptr.db.Collection(ptr.hatchetName + "_drivers").Drop(context.Background())
-	ptr.db.Collection(ptr.hatchetName + "_ops").Drop(context.Background())
-	ptr.db.Collection(ptr.hatchetName).Drop(context.Background())
-	ptr.db.Collection("hatchet").DeleteOne(context.Background(), bson.M{"name": ptr.hatchetName})
-	return err
+	if err := ptr.db.Collection(ptr.hatchetName + "_audit").Drop(context.TODO()); err != nil {
+		log.Println("Drop audit failed:", err)
+	}
+	if err := ptr.db.Collection(ptr.hatchetName + "_clients").Drop(context.TODO()); err != nil {
+		log.Println("Drop clients failed:", err)
+	}
+	if err := ptr.db.Collection(ptr.hatchetName + "_drivers").Drop(context.TODO()); err != nil {
+		log.Println("Drop drivers failed:", err)
+	}
+	if err := ptr.db.Collection(ptr.hatchetName + "_ops").Drop(context.TODO()); err != nil {
+		log.Println("Drop ops failed:", err)
+	}
+	if err := ptr.db.Collection(ptr.hatchetName).Drop(context.TODO()); err != nil {
+		log.Println("Drop logs failed:", err)
+	}
+	if _, err := ptr.db.Collection("hatchet").DeleteOne(context.TODO(), bson.M{"name": ptr.hatchetName}); err != nil {
+		log.Println("Drop hatchet failed:", err)
+	}
+	return nil
 }
 
 func (ptr *MongoDB) InsertLog(index int, end string, doc *Logv2Info, stat *OpStat) error {
 	var err error
 	data := bson.M{
-		"_id": index, "date": end, "severity": doc.Severity, "component": doc.Component, "context": doc.Context,
-		"msg": doc.Msg, "plan": doc.Attributes.PlanSummary, "type": BsonD2M(doc.Attr)["type"], "ns": doc.Attributes.NS, "message": doc.Message,
-		"op": stat.Op, "filter": stat.QueryPattern, "_index": stat.Index, "milli": doc.Attributes.Milli, "reslen": doc.Attributes.Reslen}
+		"_id":                index,
+		"date":               end,
+		"severity":           doc.Severity,
+		"component":          doc.Component,
+		"context":            doc.Context,
+		"msg":                doc.Msg,
+		"plan":               doc.Attributes.PlanSummary,
+		"type":               BsonD2M(doc.Attr)["type"],
+		"ns":                 doc.Attributes.NS,
+		"message":            doc.Message,
+		"op":                 stat.Op,
+		"filter":             stat.QueryPattern,
+		"_index":             stat.Index,
+		"milli":              doc.Attributes.Milli,
+		"reslen":             doc.Attributes.Reslen,
+		"remoteOpWaitMillis": doc.Attributes.RemoteOpWaitMillis,
+		"resolvedViews":      doc.Attributes.ResolvedViews,
+		"authorization":      doc.Attributes.Authorization,
+		"catalogCacheDatabaseLookupDurationMillis":   doc.Attributes.CatalogCacheDatabaseLookupDurationMillis,
+		"catalogCacheCollectionLookupDurationMillis": doc.Attributes.CatalogCacheCollectionLookupDurationMillis,
+		"catalogCacheIndexLookupDurationMillis":      doc.Attributes.CatalogCacheIndexLookupDurationMillis,
+		"placementVersionRefreshMillis":              doc.Attributes.PlacementVersionRefreshMillis,
+		"queryFramework":                             doc.Attributes.QueryFramework,
+		"cpuNanos":                                   doc.Attributes.CPUNanos,
+		"totalOplogSlotDurationMicros":               doc.Attributes.TotalOplogSlotDurationMicros,
+		"queues":                                     doc.Attributes.Queues,
+		"planCacheShapeHash":                         doc.Attributes.PlanCacheShapeHash,
+		"workingMillis":                              doc.Attributes.WorkingMillis,
+	}
 	ptr.logs = append(ptr.logs, data)
 	if len(ptr.logs) > BATCH_SIZE {
 		collName := ptr.hatchetName
-		_, err = ptr.db.Collection(collName).InsertMany(context.Background(), ptr.logs)
+		_, err = ptr.db.Collection(collName).InsertMany(context.TODO(), ptr.logs)
 		ptr.logs = []interface{}{}
 	}
 	return err
@@ -147,7 +194,7 @@ func (ptr *MongoDB) InsertClientConn(index int, doc *Logv2Info) error {
 	ptr.clients = append(ptr.clients, data)
 	if len(ptr.clients) > BATCH_SIZE {
 		collName := ptr.hatchetName + "_clients"
-		_, err = ptr.db.Collection(collName).InsertMany(context.Background(), ptr.clients)
+		_, err = ptr.db.Collection(collName).InsertMany(context.TODO(), ptr.clients)
 		ptr.clients = []interface{}{}
 	}
 	return err
@@ -161,18 +208,17 @@ func (ptr *MongoDB) InsertDriver(index int, doc *Logv2Info) error {
 	ptr.drivers = append(ptr.drivers, data)
 	if len(ptr.drivers) > BATCH_SIZE {
 		collName := ptr.hatchetName + "_drivers"
-		_, err = ptr.db.Collection(collName).InsertMany(context.Background(), ptr.drivers)
+		_, err = ptr.db.Collection(collName).InsertMany(context.TODO(), ptr.drivers)
 		ptr.drivers = []interface{}{}
 	}
 	return err
 }
 
 func (ptr *MongoDB) UpdateHatchetInfo(info HatchetInfo) error {
-	var err error
 	filter := bson.M{"name": ptr.hatchetName}
 	update := bson.M{"$set": bson.M{"version": info.Version, "module": info.Module, "arch": info.Arch, "os": info.OS, "start": info.Start, "end": info.End}}
 	upsertOptions := options.Update().SetUpsert(true)
-	_, err = ptr.db.Collection("hatchet").UpdateOne(context.Background(), filter, update, upsertOptions)
+	_, err := ptr.db.Collection("hatchet").UpdateOne(context.TODO(), filter, update, upsertOptions)
 	return err
 }
 
@@ -214,7 +260,8 @@ func (ptr *MongoDB) CreateMetaData() error {
 			"into": ptr.hatchetName + "_ops",
 		}},
 	}
-	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.Background(), pipeline); err != nil {
+	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.TODO(), pipeline); err != nil {
+		log.Println("CreateMetaData ops failed:", err)
 		return err
 	}
 
@@ -241,7 +288,8 @@ func (ptr *MongoDB) CreateMetaData() error {
 			"into": ptr.hatchetName + "_audit",
 		}},
 	}
-	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.Background(), pipeline); err != nil {
+	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.TODO(), pipeline); err != nil {
+		log.Println("CreateMetaData exception failed:", err)
 		return err
 	}
 
@@ -275,7 +323,8 @@ func (ptr *MongoDB) CreateMetaData() error {
 			"into": ptr.hatchetName + "_audit",
 		}},
 	}
-	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.Background(), pipeline); err != nil {
+	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.TODO(), pipeline); err != nil {
+		log.Println("CreateMetaData failed failed:", err)
 		return err
 	}
 
@@ -302,7 +351,8 @@ func (ptr *MongoDB) CreateMetaData() error {
 			"into": ptr.hatchetName + "_audit",
 		}},
 	}
-	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.Background(), pipeline); err != nil {
+	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.TODO(), pipeline); err != nil {
+		log.Println("CreateMetaData op failed:", err)
 		return err
 	}
 
@@ -324,7 +374,8 @@ func (ptr *MongoDB) CreateMetaData() error {
 			"into": ptr.hatchetName + "_audit",
 		}},
 	}
-	if _, err = ptr.db.Collection(ptr.hatchetName+"_clients").Aggregate(context.Background(), pipeline); err != nil {
+	if _, err = ptr.db.Collection(ptr.hatchetName+"_clients").Aggregate(context.TODO(), pipeline); err != nil {
+		log.Println("CreateMetaData ip failed:", err)
 		return err
 	}
 
@@ -365,7 +416,8 @@ func (ptr *MongoDB) CreateMetaData() error {
 			"into": ptr.hatchetName + "_audit",
 		}},
 	}
-	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.Background(), pipeline); err != nil {
+	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.TODO(), pipeline); err != nil {
+		log.Println("CreateMetaData reslen-ip failed:", err)
 		return err
 	}
 
@@ -392,7 +444,8 @@ func (ptr *MongoDB) CreateMetaData() error {
 			"into": ptr.hatchetName + "_audit",
 		}},
 	}
-	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.Background(), pipeline); err != nil {
+	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.TODO(), pipeline); err != nil {
+		log.Println("CreateMetaData ns failed:", err)
 		return err
 	}
 
@@ -420,10 +473,29 @@ func (ptr *MongoDB) CreateMetaData() error {
 			"into": ptr.hatchetName + "_audit",
 		}},
 	}
-	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.Background(), pipeline); err != nil {
+	if _, err = ptr.db.Collection(ptr.hatchetName).Aggregate(context.TODO(), pipeline); err != nil {
+		log.Println("CreateMetaData reslen-ns failed:", err)
 		return err
 	}
 	return nil
+}
+
+func (ptr *MongoDB) GetQueryFrameworkCounts(duration string) ([]NameValue, error) {
+	collName := ptr.hatchetName
+	pipeline := []bson.M{
+		{"$match": bson.M{"queryFramework": bson.M{"$ne": nil}}},
+		{"$group": bson.M{"_id": "$queryFramework", "count": bson.M{"$sum": 1}}},
+		{"$project": bson.M{"_id": 0, "name": "$_id", "value": "$count"}},
+	}
+	cursor, err := ptr.db.Collection(collName).Aggregate(context.TODO(), pipeline)
+	if err != nil {
+		return nil, err
+	}
+	var results []NameValue
+	if err = cursor.All(context.TODO(), &results); err != nil {
+		return nil, err
+	}
+	return results, nil
 }
 
 func (ptr *MongoDB) InsertFailedMessages(m *FailedMessages) error {

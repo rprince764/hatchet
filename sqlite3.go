@@ -29,7 +29,9 @@ func NewSQLite3DB(dbfile string, hatchetName string, cacheSize int) (*SQLite3DB,
 	var err error
 	sqlite := &SQLite3DB{dbfile: dbfile, hatchetName: hatchetName}
 	dirname := filepath.Dir(dbfile)
-	os.Mkdir(dirname, 0755)
+	if err = os.MkdirAll(dirname, 0755); err != nil {
+		return nil, err
+	}
 	if sqlite.db, err = sql.Open("sqlite3_extended", dbfile); err != nil {
 		return nil, err
 	}
@@ -148,7 +150,7 @@ func (ptr *SQLite3DB) InsertLog(index int, end string, doc *Logv2Info, stat *OpS
 	_, err = ptr.pstmt.Exec(index, end, doc.Severity, doc.Component, doc.Context,
 		doc.Msg, doc.Attributes.PlanSummary, BsonD2M(doc.Attr)["type"], doc.Attributes.NS, doc.Message,
 		stat.Op, stat.QueryPattern, stat.Index, doc.Attributes.Milli, doc.Attributes.Reslen,
-		doc.Marker)
+		doc.Attributes.QueryFramework, doc.Marker)
 	return err
 }
 
@@ -323,6 +325,7 @@ func CreateTables(db *sql.DB, hatchetName string) ([]string, error) {
 			_index text,
 			milli integer,
 			reslen integer,
+			queryFramework text,
 			marker integer);`,
 
 		`CREATE TABLE IF NOT EXISTS %v_audit (
@@ -408,8 +411,30 @@ func CreateIndexes(db *sql.DB, hatchetName string) ([]string, error) {
 // GetHatchetPreparedStmt returns prepared statement of the hatchet table
 func GetHatchetPreparedStmt(hatchetName string) string {
 	return fmt.Sprintf(`INSERT INTO %v (id, date, severity, component, context,
-		msg, plan, type, ns, message, op, filter, _index, milli, reslen, marker)
-		VALUES(?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?)`, hatchetName)
+		msg, plan, type, ns, message, op, filter, _index, milli, reslen, queryFramework, marker)
+		VALUES(?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?)`, hatchetName)
+}
+
+func (ptr *SQLite3DB) GetQueryFrameworkCounts(duration string) ([]NameValue, error) {
+	var err error
+	var rows *sql.Rows
+	query := fmt.Sprintf(`SELECT queryFramework, COUNT(*) FROM %v WHERE queryFramework != '' GROUP BY queryFramework`, ptr.hatchetName)
+	if ptr.verbose {
+		explain(ptr.db, query)
+	}
+	if rows, err = ptr.db.Query(query); err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var results []NameValue
+	for rows.Next() {
+		var nv NameValue
+		if err = rows.Scan(&nv.Name, &nv.Value); err != nil {
+			return nil, err
+		}
+		results = append(results, nv)
+	}
+	return results, nil
 }
 
 // GetClientPreparedStmt returns prepared statement of clients table
@@ -434,8 +459,9 @@ func explain(db *sql.DB, query string) error {
 	defer result.Close()
 	var line, a, b, c string
 	for result.Next() {
-		result.Scan(&a, &b, &c, &line)
-		log.Println("->", line)
+		if err = result.Scan(&a, &b, &c, &line); err != nil {
+			log.Println("->", line)
+		}
 	}
 	return nil
 }

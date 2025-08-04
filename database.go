@@ -41,6 +41,7 @@ type Database interface {
 	GetSlowOps(orderBy string, order string, collscan bool) ([]OpStat, error)
 	GetSlowestLogs(topN int) ([]LegacyLog, error)
 	GetVerbose() bool
+	GetQueryFrameworkCounts(duration string) ([]NameValue, error)
 	InsertClientConn(index int, doc *Logv2Info) error
 	InsertDriver(index int, doc *Logv2Info) error
 	InsertFailedMessages(m *FailedMessages) error

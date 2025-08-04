@@ -7,6 +7,7 @@ package hatchet
 
 import (
 	"database/sql"
+	"os"
 	"regexp"
 	"testing"
 
@@ -23,16 +24,25 @@ func TestAnalyze(t *testing.T) {
 				return conn.RegisterFunc("regexp", regex, true)
 			},
 		})
-	filename := "testdata/mongod_ops.log.gz"
+	os.RemoveAll("data")
+	filename := "logs/sample-mongod.log.gz"
 	logv2 := &Logv2{testing: true, url: SQLITE3_FILE}
 	err := logv2.Analyze(filename, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
+	dbase, err := GetDatabase(logv2.hatchetName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dbase.Close()
+	if err = dbase.Drop(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestAnalyzeLegacy(t *testing.T) {
-	filename := "testdata/mongod_ops.log.gz"
+	filename := "logs/sample-mongod.log.gz"
 	logv2 := &Logv2{testing: true, legacy: true}
 	err := logv2.Analyze(filename, 0)
 	if err != nil {

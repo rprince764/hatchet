@@ -48,7 +48,9 @@ func AnalyzeSlowOp(doc *Logv2Info) (*OpStat, error) {
 		return stat, errors.New("unsupported command")
 	}
 	b, _ := bson.Marshal(doc.Attr)
-	bson.Unmarshal(b, &doc.Attributes)
+	if err = bson.Unmarshal(b, &doc.Attributes); err != nil {
+		return stat, err
+	}
 	stat.TotalMilli = doc.Attributes.Milli
 	stat.Namespace = doc.Attributes.NS
 	if stat.Namespace == "" {

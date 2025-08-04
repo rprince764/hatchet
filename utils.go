@@ -9,8 +9,9 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	mathrand "math/rand"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -66,9 +67,10 @@ func getHatchetName(logname string) string {
 	if i = strings.LastIndex(hatchetName, "_gz"); i > 0 {
 		hatchetName = hatchetName[:i]
 	}
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, TAIL_SIZE)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
 	tail := fmt.Sprintf("%x", b)[:TAIL_SIZE-1]
 
 	r := []rune(hatchetName) // convert string to runes
@@ -107,8 +109,10 @@ func GetSQLDateSubString(start string, end string) string {
 		return "SUBSTR(date, 1, 18)||'9'"
 	} else if minutes < 60 {
 		return "SUBSTR(date, 1, 16)||':59'"
-	} else {
+	} else if minutes < 1440 { // less than a day
 		return "SUBSTR(date, 1, 15)||'9:59'"
+	} else {
+		return "SUBSTR(date, 1, 10)"
 	}
 }
 
@@ -287,15 +291,14 @@ func ObfuscateWord(word string) string {
 	lowers := []rune("abcdefghijklmnopqrstuvwxyz")
 	uppers := []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	digits := []rune("0123456789")
-	rand.Seed(time.Now().UnixNano())
 	b := make([]rune, length)
 	for i := range word {
 		if unicode.IsLower(rune(word[i])) {
-			b[i] = lowers[rand.Intn(len(lowers))]
+			b[i] = lowers[mathrand.Intn(len(lowers))]
 		} else if unicode.IsUpper(rune(word[i])) {
-			b[i] = uppers[rand.Intn(len(uppers))]
+			b[i] = uppers[mathrand.Intn(len(uppers))]
 		} else if unicode.IsDigit(rune(word[i])) {
-			b[i] = digits[rand.Intn(len(digits))]
+			b[i] = digits[mathrand.Intn(len(digits))]
 		} else {
 			b[i] = rune(word[i])
 		}
@@ -320,6 +323,8 @@ func BsonD2M(d bson.D) bson.M {
 	if err != nil {
 		return m
 	}
-	bson.Unmarshal(b, &m)
+	if err = bson.Unmarshal(b, &m); err != nil {
+		return nil
+	}
 	return m
 }

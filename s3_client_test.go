@@ -8,44 +8,79 @@ package hatchet
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 )
 
-const (
-	S3Profile     = "default"
-	testEndpoint  = "http://localhost:9090"
-	testRegion    = "us-east-1"
-	testAccessKey = "test-access-key"
-	testSecretKey = "test-secret-key"
-	testBucket    = "test-bucket"
-	testKey       = "test-key"
-)
-
-func TestAWS(t *testing.T) {
-	_, err := NewS3Client(S3Profile)
-	if err != nil {
-		t.Fatalf("failed to create S3 client: %v", err)
-	}
+type mockS3Client struct {
+	s3iface.S3API
+	err    error
+	bucket string
+	key    string
+	body   []byte
 }
 
-func TestNewS3Client(t *testing.T) {
-	s3client, err := NewS3Client(S3Profile, testEndpoint)
-	if err != nil {
-		t.Fatalf("failed to create S3 client: %v", err)
+func (m *mockS3Client) CreateBucket(input *s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
+	m.bucket = *input.Bucket
+	return &s3.CreateBucketOutput{}, m.err
+}
+
+func (m *mockS3Client) DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error) {
+	m.bucket = ""
+	return &s3.DeleteBucketOutput{}, m.err
+}
+
+func (m *mockS3Client) PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
+	m.key = *input.Key
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(input.Body)
+	m.body = buf.Bytes()
+	return &s3.PutObjectOutput{}, m.err
+}
+
+func (m *mockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
+	return &s3.GetObjectOutput{
+		Body: ioutil.NopCloser(bytes.NewReader(m.body)),
+	}, m.err
+}
+
+func (m *mockS3Client) DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error) {
+	m.key = ""
+	m.body = nil
+	return &s3.DeleteObjectOutput{}, m.err
+}
+
+func TestS3Client(t *testing.T) {
+	mockSvc := &mockS3Client{}
+	s3client := &S3Client{
+		service: mockSvc,
 	}
 
 	// create a new S3 bucket
 	bucketName := "test-bucket"
-	s3client.DeleteBucket(bucketName) // just in case
-	err = s3client.CreateBucket(bucketName)
+	err := s3client.CreateBucket(bucketName)
 	if err != nil {
 		t.Fatalf("failed to create S3 bucket: %v", err)
 	}
 
 	// upload a file to S3
 	fileName := "test-file.txt"
-	filePath := "./testdata/" + fileName
+	testDataDir := "./testdata"
+	if err := os.MkdirAll(testDataDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(testDataDir) })
+	filePath := testDataDir + "/" + fileName
+	f, err := os.Create(filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString("hello s3")
+	f.Close()
 	err = s3client.PutObject(bucketName, fileName, filePath)
 	if err != nil {
 		t.Fatalf("failed to upload file to S3: %v", err)
