@@ -168,8 +168,8 @@ func Run(fullVersion string) {
 
 	router.GET("/hatchets/:hatchet/charts/:attr", ChartsHandler)
 	router.GET("/hatchets/:hatchet/logs/:attr", LogsHandler)
-	router.GET("/hatchets/:hatchet/stats/:attr", StatsHandler)
 	router.GET("/hatchets/:hatchet/stats/query_framework", StatsHandler)
+	router.GET("/hatchets/:hatchet/stats/:attr", StatsHandler)
 
 	addr := fmt.Sprintf(":%d", *port)
 	if listener, err := net.Listen("tcp", addr); err != nil {
