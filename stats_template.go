@@ -18,11 +18,7 @@ const MIN_MONGO_VER = "5.0"
 
 // GetStatsTableTemplate returns HTML
 func GetStatsTableTemplate(collscan bool, orderBy string, download string) (*template.Template, error) {
-	html := headers
-	if download == "" {
-		html = getContentHTML()
-	}
-	html += getStatsTable(collscan, orderBy, download) + "</body></html>"
+	html := getStatsTable(collscan, orderBy, download)
 	return template.New("hatchet").Funcs(template.FuncMap{
 		"add": func(a int, b int) int {
 			return a + b
@@ -121,8 +117,7 @@ func getStatsTable(collscan bool, orderBy string, download string) string {
 
 // GetQueryFrameworkTemplate returns HTML
 func GetQueryFrameworkTemplate() (*template.Template, error) {
-	html := getContentHTML()
-	html += `
+	html := `
 	<div align='left'>
 	<table width='100%'><tr><th>Query Framework</th><th>Count</th></tr>
 {{range $n, $value := .Data}}
@@ -135,6 +130,5 @@ func GetQueryFrameworkTemplate() (*template.Template, error) {
 	</div>
 	<div align='center'><hr/><p/>@simagix</div>
 </div>`
-	html += "</body></html>"
 	return template.New("hatchet").Parse(html)
 }
